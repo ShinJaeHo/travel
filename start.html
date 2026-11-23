@@ -1,0 +1,1954 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>2027.01.20~25 도쿄 5박 6일 가족 여행 마스터 지도 플래너</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <style>
+    :root {
+      --bg: #f1f5f9;
+      --surface: #ffffff;
+      --surface-alt: #f8fafc;
+      --text: #0f172a;
+      --text-muted: #475569;
+      --border: #e2e8f0;
+      --primary: #1e3a8a;
+      --primary-hover: #1d4ed8;
+      --primary-light: #dbeafe;
+      --accent: #0d9488;
+      --accent-light: #ccfbf1;
+      --food: #ea580c;
+      --food-light: #ffedd5;
+      --radius: 12px;
+      --shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    /* 상단 컨트롤 바 */
+    header {
+      background: #0f172a;
+      color: #fff;
+      padding: 12px 18px;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.22);
+    }
+
+    .header-inner {
+      max-width: 1420px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .title-area h1 {
+      font-size: 1.08rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .title-area p {
+      font-size: 0.75rem;
+      color: #94a3b8;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .date-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .date-btn {
+      background: #1e293b;
+      color: #cbd5e1;
+      border: 1px solid #334155;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .date-btn:hover { background: #334155; color: #fff; }
+    .date-btn.active {
+      background: #2563eb;
+      color: #fff;
+      border-color: #60a5fa;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.35);
+    }
+
+    .toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 11px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: 1px solid #475569;
+      background: #1e293b;
+      color: #e2e8f0;
+      transition: all 0.15s;
+    }
+
+    .toggle-btn.active-route {
+      background: var(--accent);
+      border-color: #5eead4;
+      color: #fff;
+    }
+
+    .toggle-btn.active-food {
+      background: var(--food);
+      border-color: #fdba74;
+      color: #fff;
+    }
+
+    .toggle-btn.active-prep {
+      background: #7c3aed;
+      border-color: #c4b5fd;
+      color: #fff;
+    }
+
+    /* 메인 작업공간 */
+    .workspace {
+      max-width: 1420px;
+      margin: 14px auto;
+      padding: 0 14px;
+      display: grid;
+      grid-template-columns: 450px 1fr;
+      gap: 14px;
+      align-items: start;
+    }
+
+    @media (max-width: 980px) {
+      .workspace { grid-template-columns: 1fr; }
+      #map { height: 390px !important; }
+      .timeline-list { max-height: none !important; }
+    }
+
+    /* 좌측 일정 패널 */
+    .panel {
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 14px 16px;
+      background: var(--surface-alt);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-header h2 {
+      font-size: 1.02rem;
+      color: var(--primary);
+      margin-bottom: 3px;
+    }
+
+    .panel-header p {
+      font-size: 0.79rem;
+      color: var(--text-muted);
+    }
+
+    .timeline-list {
+      padding: 12px 14px;
+      max-height: calc(100vh - 145px);
+      overflow-y: auto;
+    }
+
+    /* 이동 구간 카드 (순서표현 ON 시 표시) */
+    .transit-card {
+      margin: 8px 0 8px 16px;
+      padding: 9px 12px;
+      background: #f0fdfa;
+      border-left: 3px solid var(--accent);
+      border-radius: 0 8px 8px 0;
+      font-size: 0.79rem;
+      color: #115e59;
+      display: none;
+    }
+
+    .transit-card.visible {
+      display: block;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .transit-badge {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.71rem;
+      padding: 1px 6px;
+      border-radius: 4px;
+      margin-right: 5px;
+    }
+
+    /* 스팟 카드 */
+    .spot-card {
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: #fff;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .spot-card:hover, .spot-card.selected {
+      border-color: #2563eb;
+      background: #f8faff;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
+    }
+
+    .spot-top {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 5px;
+    }
+
+    .step-num {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 800;
+      font-size: 0.82rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .step-num.hotel { background: #475569; }
+
+    .spot-title {
+      font-weight: 700;
+      font-size: 0.93rem;
+      color: var(--text);
+      flex: 1;
+    }
+
+    .spot-time {
+      font-size: 0.74rem;
+      font-weight: 700;
+      color: var(--primary);
+      background: var(--primary-light);
+      padding: 2px 7px;
+      border-radius: 5px;
+      white-space: nowrap;
+    }
+
+    .spot-desc {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-bottom: 7px;
+    }
+
+    .spot-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .detail-open-btn {
+      font-size: 0.76rem;
+      font-weight: 700;
+      color: var(--primary);
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .detail-open-btn:hover { background: #dbeafe; }
+
+    /* 스팟 하단 근처 음식점 리스트 */
+    .nearby-foods {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px dashed #fed7aa;
+    }
+
+    .nearby-foods-header {
+      font-size: 0.76rem;
+      font-weight: 800;
+      color: var(--food);
+      margin-bottom: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .food-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      background: #fff7ed;
+      margin-bottom: 5px;
+      font-size: 0.79rem;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+
+    .food-item:hover { border-color: var(--food); }
+
+    .food-code {
+      background: var(--food);
+      color: #fff;
+      font-weight: 800;
+      font-size: 0.71rem;
+      padding: 1px 6px;
+      border-radius: 4px;
+      white-space: nowrap;
+      margin-top: 2px;
+    }
+
+    .food-info { flex: 1; }
+    .food-info strong { color: #9a3412; display: block; }
+    .food-info span { color: #7c2d12; font-size: 0.75rem; }
+
+    /* 우측 지도 + 상세 정보 드로어 컨테이너 */
+    .map-column {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: sticky;
+      top: 70px;
+    }
+
+    @media (max-width: 980px) {
+      .map-column { position: static; }
+    }
+
+    .map-wrapper {
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    #map {
+      width: 100%;
+      height: 430px;
+      z-index: 1;
+    }
+
+    .map-legend {
+      padding: 8px 14px;
+      background: var(--surface-alt);
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .legend-items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+
+    /* 상세 정보 패널 (번호/카드 클릭 시 상세 표시) */
+    .detail-drawer {
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 2px solid #2563eb;
+      box-shadow: 0 6px 18px rgba(37, 99, 235, 0.14);
+      padding: 18px 20px;
+      transition: background-color 0.2s ease;
+    }
+
+    .detail-drawer.flash {
+      background: #eff6ff;
+    }
+
+    .detail-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 14px;
+    }
+
+    .detail-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 800;
+      padding: 3px 9px;
+      border-radius: 6px;
+      margin-bottom: 5px;
+    }
+
+    .badge-spot { background: var(--primary-light); color: var(--primary); }
+    .badge-food { background: var(--food-light); color: #9a3412; }
+    .badge-prep { background: #ede9fe; color: #5b21b6; }
+
+    .detail-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .gmap-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #1a73e8;
+      color: #fff;
+      text-decoration: none;
+      font-size: 0.82rem;
+      font-weight: 700;
+      padding: 8px 14px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(26, 115, 232, 0.3);
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+
+    .gmap-btn:hover { background: #1557b0; }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+    }
+
+    .detail-box {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 12px 14px;
+    }
+
+    .detail-box h4 {
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: var(--primary);
+      margin-bottom: 7px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .detail-box.food-theme h4 { color: #c2410c; }
+    .detail-box.transit-theme h4 { color: #0f766e; }
+
+    .detail-list {
+      list-style: none;
+      font-size: 0.83rem;
+      color: #334155;
+    }
+
+    .detail-list li {
+      margin-bottom: 5px;
+      padding-left: 14px;
+      position: relative;
+    }
+
+    .detail-list li::before {
+      content: "•";
+      position: absolute;
+      left: 0;
+      color: #64748b;
+      font-weight: bold;
+    }
+
+    .review-pill {
+      display: inline-block;
+      background: #fef3c7;
+      color: #92400e;
+      font-weight: 700;
+      font-size: 0.76rem;
+      padding: 2px 8px;
+      border-radius: 5px;
+      margin-bottom: 6px;
+    }
+
+    /* 지도 커스텀 핀 */
+    .custom-pin {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      color: #fff;
+      font-weight: 800;
+      border: 2.5px solid #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      font-family: sans-serif;
+      cursor: pointer;
+    }
+
+    .pin-spot { background: #1e3a8a; width: 30px; height: 30px; font-size: 13px; }
+    .pin-hotel { background: #334155; width: 30px; height: 30px; font-size: 13px; }
+    .pin-food {
+      background: #ea580c;
+      border-radius: 6px;
+      padding: 0 5px;
+      min-width: 34px;
+      height: 22px;
+      font-size: 11px;
+    }
+
+    .route-label {
+      background: rgba(13, 148, 136, 0.95);
+      color: #fff;
+      border: 1.5px solid #fff;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <div class="title-area">
+        <h1>🗺️ 2027.01.20~25 도쿄 5박 6일 가족 여행 지도 플래너</h1>
+        <p>거점: 호텔 마이스테이 프리미어 하마마쓰초 (성인3·초5 1명) · 핀/카드 클릭 시 하단 상세창 자동 이동</p>
+      </div>
+
+      <div class="controls">
+        <div class="date-tabs" id="dateTabs"></div>
+        <button class="toggle-btn" id="btnRouteOrder">🧭 순서표현 OFF</button>
+        <button class="toggle-btn" id="btnFoodToggle">🍽️ 음식점 핀 OFF</button>
+        <button class="toggle-btn" id="btnPrepGuide">🎒 입국·스이카 가이드</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <!-- 좌측: 선택 날짜 일정 목록 -->
+    <aside class="panel">
+      <div class="panel-header">
+        <h2 id="dayTitle">일정 로딩 중...</h2>
+        <p id="daySubtitle"></p>
+      </div>
+      <div class="timeline-list" id="timelineList"></div>
+    </aside>
+
+    <!-- 우측: 지도 + 하단 상세 정보 뷰어 -->
+    <div class="map-column">
+      <section class="map-wrapper">
+        <div id="map"></div>
+        <div class="map-legend">
+          <div class="legend-items">
+            <span><i class="dot" style="background:#334155;"></i>숙: 거점 숙소</span>
+            <span><i class="dot" style="background:#1e3a8a;"></i>1, 2, 3...: 방문 순서</span>
+            <span><i class="dot" style="background:#ea580c; border-radius:3px;"></i>1-1, 1-2...: 근처 추천순 식당</span>
+          </div>
+          <div>📌 지도 핀 또는 왼쪽 카드를 누르면 아래 상세창이 열리고 자동 스크롤됩니다</div>
+        </div>
+      </section>
+
+      <!-- 클릭 시 상세 정보가 렌더링되는 패널 -->
+      <section class="detail-drawer" id="detailDrawer"></section>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script>
+    /**
+     * ============================================================================
+     * [2027.01.20 ~ 01.25 도쿄 5박 6일 가족 여행 데이터]
+     * - 인원: 성인 3명(중1 포함) + 소아 1명(초5, 어린이용 My Suica 대상)
+     * - 거점: 호텔 마이스테이 프리미어 하마마쓰초 (5박 연박, 디즈니 제외)
+     * ============================================================================
+     */
+    const HOTEL_BASE = {
+      name: "호텔 마이스테이 프리미어 하마마쓰초",
+      lat: 35.6565,
+      lng: 139.7556,
+      googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=HOTEL+MYSTAYS+PREMIER+Hamamatsucho"
+    };
+
+    const ITINERARY_DATA = [
+      {
+        id: "day1",
+        label: "1/20(수) Day 1",
+        title: "1/20(수) 하네다 입국 & 도쿄역·마루노우치·긴자 야경",
+        subtitle: "하네다 입국(스이카 발급) → 숙소 체크인 → KITTE 옥상정원 → 도쿄역 캐릭터 스트리트·긴자",
+        stops: [
+          {
+            step: 0,
+            isHotel: true,
+            name: HOTEL_BASE.name,
+            lat: HOTEL_BASE.lat,
+            lng: HOTEL_BASE.lng,
+            time: "15:30",
+            desc: "하네다 공항에서 교통카드(성인 Welcome Suica 3장 + 초5 어린이 My Suica 1장) 발급 후 도쿄 모노레일로 하마마쓰초역 직통 이동",
+            googleMapsUrl: HOTEL_BASE.googleMapsUrl,
+            spotDetail: {
+              access: "하네다 공항 제3터미널 → 도쿄 모노레일 직통(약 13~18분) → JR 하마마쓰초역 북쪽 출구 도보 5분",
+              highlights: [
+                "성인 3명(중1 포함): 모노레일 개찰구 빨간색 전용 발매기에서 'Welcome Suica'(보증금 0원, 28일 유효) 발급",
+                "어린이 1명(초5): JR 동일본 여행서비스센터 유인 창구에서 실물 여권 제시 후 '어린이용 My Suica'(요금 50% 자동 할인) 발급"
+              ],
+              reviewSummary: "하네다 공항에서 환승 없이 15분 내외로 도착해 첫날 체력 소모가 거의 없으며, 주변 편의점과 식당 접근성이 뛰어남."
+            },
+            transitToNext: {
+              line: "JR 야마노테선 (JY28 하마마쓰초 → JY01 도쿄)",
+              duration: "약 6분 (3정거장 / IC 성인 167엔 · 소아 83엔)",
+              detail: "하마마쓰초역 2번 홈(도쿄·우에노 방면) 탑승",
+              howToRide: [
+                "호텔에서 JR 하마마쓰초역 북쪽 출구 개찰구로 진입 (스이카 터치)",
+                "2번 승강장(JR 야마노테선 도쿄·우에노 방면) 탑승 → 신바시(JY29) → 유라쿠초(JY30) → 도쿄역(JY01) 하차",
+                "도쿄역 하차 후 '마루노우치 남쪽 출구(Marunouchi South Exit)' 표지판을 따라 지상 광장으로 이동"
+              ]
+            },
+            foods: []
+          },
+          {
+            step: 1,
+            name: "KITTE 마루노우치 옥상정원 & 도쿄역 야경",
+            lat: 35.6812,
+            lng: 139.7671,
+            time: "18:00",
+            desc: "도쿄역 붉은 벽돌 역사 야경 감상 후 바로 옆 KITTE 6층 무료 옥상정원('KITTE 가든') 파노라마 조망",
+            googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=KITTE+Marunouchi+Tokyo+Station",
+            spotDetail: {
+              access: "JR 도쿄역 마루노우치 남쪽 출구 나와 왼편 대각선 도보 1분 (지하 통로 직결)",
+              highlights: [
+                "KITTE 6층 무료 야외 옥상정원에서 도쿄역 붉은 벽돌 역사와 발착 열차 야경을 정면 조망",
+                "1월 겨울 저녁 야외 테라스는 바람이 차가우므로 방한복·핫팩 착용 권장 (삼각대 사용 불가)"
+              ],
+              reviewSummary: "입장료 없이 도쿄역 야경을 가장 아름답게 담을 수 있는 명소. 바로 아래층(5층) 식당가와 연계하기 좋음."
+            },
+            transitToNext: {
+              line: "도쿄역 지하 1층 연결통로 도보 이동",
+              duration: "도보 약 5분",
+              detail: "마루노우치 측에서 야에스 측 지하 1층 '도쿄역 일번가'로 횡단",
+              howToRide: [
+                "KITTE 지하 1층 또는 도쿄역 마루노우치 지하 중앙출구 인근 '북쪽 자유통로' 이용",
+                "야에스(Yaesu) 방면 표지판을 따라 개찰구 밖 지하 1층 '도쿄역 일번가(First Avenue Tokyo Station)' 진입"
+              ]
+            },
+            foods: [
+              {
+                rank: 1,
+                name: "네무로 하나마루 KITTE 마루노우치점",
+                lat: 35.6798,
+                lng: 139.7649,
+                genre: "홋카이도 회전초밥 (추천 1순위)",
+                budget: "1인 약 2,500 ~ 4,000엔",
+                hours: "11:00 ~ 22:00 (피크 타임 대기 발생)",
+                signature: "가리비 관자(호타테), 연어, 게살 군함, 생새우 초밥",
+                note: "KITTE 5층 위치. 도착 직후 키오스크에서 대기 번호표를 먼저 뽑고 6층 옥상정원을 둘러보면 시간 절약",
+                reviewSummary: "도쿄역 인근 가성비 최고 인기 회전초밥집. 횟감이 두툼하고 신선해 가족 만족도가 높으나 저녁 피크에는 대기가 길어짐.",
+                googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Nemuro+Hanamaru+KITTE+Marunouchi"
+              },
+              {
+                rank: 2,
+                name: "도쿄 라멘 스트리트 (로쿠린샤 등 8개 명점)",
+                lat: 35.6804,
+                lng: 139.7685,
+                genre: "츠케멘 · 돈코츠/시오 라멘 (추천 2순위)",
+                budget: "1인 약 1,000 ~ 1,500엔",
+                hours: "10:00 ~ 22:30 (매장별 상이)",
+                signature: "로쿠린샤 특제 츠케멘, 소라노이로 베지 소바, 히루가오 시오 라멘",
+                note: "도쿄역 지하 1층 일번가 위치. 입구 식권 자판기(IC교통카드·현금 결제) 이용",
+                reviewSummary: "도쿄 유명 라멘 브랜드 8곳이 한곳에 모여 있어 가족 각자 취향대로 선택 가능. '로쿠린샤' 츠케멘이 가장 인기가 높음.",
+                googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Tokyo+Ramen+Street+Tokyo+Station"
+              }
+            ]
+          },
+          {
+            step: 2,
+            name: "도쿄 캐릭터 스트리트 & 마루노우치·긴자 야간 산책",
+            lat: 35.6819,
+            lng: 139.7682,
+            time: "19:30",
+            desc: "도쿄역 지하 1층 치이카와 랜드·점프샵 구경 후 마루노우치 나카도리 일루미네이션 및 긴자 거리 산책",
+            googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Tokyo+Character+Street+Tokyo+Station",
+            spotDetail: {
+              access: "JR 도쿄역 야에스 북쪽 출구 지하 1층 직결 → 도보 이동 시 마루노우치 나카도리·긴자 4초메 방면 연결",
+              highlights: [
+                "치이카와 랜드 도쿄역점, 점프샵, 포켓몬 스토어 등 30여 개 공식 캐릭터 샵 밀집 (보통 20:30 마감)",
+                "긴자 주요 상점은 20:00~20:30 마감하므로 쇼핑 희망 시 캐릭터 스트리트 먼저 방문 후 유라쿠초역(JY30)에서 야마노테선으로 하마마쓰초 복귀"
+              ],
+              reviewSummary: "첫날 밤 가볍게 도쿄의 화려한 일루미네이션과 캐릭터 샵을 둘러보기에 최적의 동선."
+            },
+            transitToNext: null,
+            foods: []
+          }
+        ]
+      },
+      {
+        id: "day2",
+        label: "1/21(목) Day 2",
+        title: "1/21(목) 가마쿠라 · 에노시마 당일치기",
+        subtitle: "시나가와 환승 → 에노덴 1일권 → 쓰루가오카 하치만구 → 대불·고료신사 → 슬램덩크 건널목 → 에노시마 야경",
+        stops: [
+          {
+            step: 0,
+            isHotel: true,
+            name: HOTEL_BASE.name,
+            lat: HOTEL_BASE.lat,
+            lng: HOTEL_BASE.lng,
+            time: "08:40",
+            desc: "도쿄역 긴 지하 환승 대신 시나가와역 환승 루트로 가마쿠라·에노시마 당일치기 출발",
+            googleMapsUrl: HOTEL_BASE.googleMapsUrl,
+            spotDetail: {
+              access: "JR 하마마쓰초역 출발 → 시나가와역 환승 → 가마쿠라역 도착 (편도 약 55분)",
+              highlights: [
+                "가마쿠라역 도착 후 매표기에서 '에노덴 1일 승차권(노리오리쿤)' 발권 (성인 3명·중1 포함, 초5 아동 50% 할인)",
+                "쇼난 바닷바람이 차가우므로 핫팩·목도리·장갑 필수 지참"
+              ],
+              reviewSummary: "하마마쓰초에서는 도쿄역이 아닌 시나가와역에서 JR 요코스카선으로 갈아타는 것이 훨씬 빠르고 편함."
+            },
+            transitToNext: {
+              line: "JR 야마노테선(JY28→JY25 시나가와 6분) → JR 요코스카선(JO07 가마쿠라 45분)",
+              duration: "총 약 55분 (IC 성인 945엔 · 소아 472엔)",
+              detail: "시나가와역(JY25) 환승 후 요코스카선(즈시·구리하마 방면) 탑승",
+              howToRide: [
+                "1단계: JR 하마마쓰초역 3·4번 홈(시나가와 방면)에서 야마노테선 외선순환 또는 게이힌토호쿠선 탑승 → 2정거장(6분) 시나가와역 하차",
+                "2단계: 시나가와역 개찰구를 나가지 않고 'JR 요코스카선(13·14번 홈)'으로 에스컬레이터 이동",
+                "3단계: 즈시(Zushi) 또는 구리하마(Kurihama) 방면 열차 탑승 → 약 45분 후 가마쿠라역(JO07) 하차"
+              ]
+            },
+            foods: []
+          },
+          {
+            step: 1,
+            name: "가마쿠라 코마치도리 & 쓰루가오카 하치만구",
+            lat: 35.3259,
+            lng: 139.5564,
+            time: "10:00",
+            desc: "가마쿠라역 동쪽 출구 붉은 토리이 상점가 간식 탐방, 쓰루가오카 하치만구 참배 및 이른 점심 식사",
+            googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Tsurugaoka+Hachimangu+Kamakura",
+            spotDetail: {
+              access: "JR 가마쿠라역 동쪽 출구 왼편 붉은 도리이(코마치도리) 진입 후 직진 도보 10분",
+              highlights: [
+                "코마치도리 명물 멘치카츠, 딸기 찹쌀떡, 말차 젤라또 길거리 간식 체험",
+                "11시 30분 전후 이른 점심을 진행해야 대기 시간을 줄이고 오후 에노덴 일정을 여유롭게 소화 가능"
+              ],
+              reviewSummary: "가마쿠라의 역사와 활기찬 상점가 분위기를 동시에 느낄 수 있는 핵심 출발지."
+            },
+            transitToNext: {
+              line: "에노시마 전철 (에노덴: EN01/EN15 가마쿠라 → 하세역)",
+              duration: "약 5분 (3정거장 / 노리오리쿤 1일권 이용)",
+              detail: "가마쿠라역 서쪽 출구 에노덴 전용 개찰구 탑승",
+              howToRide: [
+                "가마쿠라역 서쪽 출구 쪽 '에노덴(Enoden)' 전용 개찰구로 이동 (1일권 제시)",
+                "후지사와(Fujisawa) 방면 열차 탑승 → 와다즈카 → 유이가하마 → 하세역(3정거장, 약 5분) 하차"
+              ]
+            },
+            foods: [
+              {
+                rank: 1,
+                name: "캬라웨이 (Caraway)",
+                lat: 35.3204,
+                lng: 139.5523,
+                genre: "일본식 카레 노포 (추천 1순위)",
+                budget: "1인 약 900 ~ 1,200엔",
+                hours: "11:30 ~ 19:30 (월요일 휴무 확인)",
+                signature: "비프 카레, 치킨 카레, 치즈 카레 (기본 밥 양 매우 푸짐)",
+                note: "코마치도리 메인 거리에서 우측 골목 안쪽 위치. 오픈(11:30) 전후 방문 추천, 밥 양 '소(少)' 주문 가능",
+                reviewSummary: "30여 가지 향신료를 오래 끓여낸 진한 루와 압도적인 가성비로 유명한 가마쿠라 대표 노포.",
+                googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Caraway+Curry+Kamakura"
+              },
+              {
+                rank: 2,
+                name: "미요시 우동 (Kamakura Miyoshi)",
+                lat: 35.3228,
+                lng: 139.5546,
+                genre: "자가제면 우동 · 미니 시라스동 (추천 2순위)",
+                budget: "1인 약 1,200 ~ 1,800엔",
+                hours: "11:00 ~ 16:00 전후",
+                signature: "자루우동 + 튀김 + 미니 시라스동 세트",
+                note: "일본 전통 가옥 분위기 속에서 쫄깃한 수타식 자가제면 우동과 가마쿠라 명물 시라스를 함께 즐기기 좋음",
+                reviewSummary: "차분한 한옥·일식 가옥 분위기에서 아이들과 편안하게 식사하기 좋으며 면발 탄력이 뛰어나다는 평이 많음.",
+                googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Kamakura+Miyoshi+Udon"
+              }
+            ]
+          },
+          {
+            step: 2,
+            name: "하세역: 고토쿠인(가마쿠라 대불) & 고료신사",
+            lat: 35.3167,
+            lng: 139.5357,
+            time: "12:15",
+            desc: "고토쿠인 청동 대불(성인 300엔·소아 150엔) 관람 후 에노덴 선로 바로 앞 고료신사 포토존 방문",
+            googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Kotoku-in+Great+Buddha+of+Kamakura",
+            spotDetail: {
+              access: "하세역에서 북쪽 큰길 직진 도보 7분 고토쿠인 도착 → 관람 후 서쪽 주택가 골목 도보 5분 고료신사 이동",
+              highlights: [
+                "고토쿠인: 높이 11.3m 야외 청동 대불 관람 (대불 내부 진입 별도 소액)",
+                "고료신사: 신사 도리이 바로 코앞으로 초록색 에노덴 전차가 통과하는 유명 철길 포토존"
+              ],
+              reviewSummary: "고료신사 앞 철길 건널목은 현지 주민 생활 도로이므로 차단기 밖 안전선을 반드시 지키며 촬영해야 함."
+            },
+            transitToNext: {
+              line: "에노덴 (하세 → 고쿠라쿠지 → 가마쿠라코코마에)",
+              duration: "약 10분 (4정거장)",
+              detail: "고쿠라쿠지역 목조 간이역 및 철길 뷰 카페 경유 가능",
+              howToRide: [
+                "하세역으로 복귀 후 후지사와 방면 에노덴 탑승 → 1정거장(2분) 고쿠라쿠지역 하차",
+                "레트로 목조 역사 및 붉은 다리 산책 후 같은 방향 열차 재탑승 → 3정거장(6분) 가마쿠라코코마에역 하차"
+              ]
+            },
+            foods: [
+              {
+                rank: 1,
+                name: "요리도코로 (Yoridokoro)",
+                lat: 35.3095,
+                lng: 139.5288,
+                genre: "에노덴 철길 뷰 카페 · 가정식 (추천 1순위)",
+                budget: "카페 600~1,000엔 / 정식 1,300~1,800엔",
+                hours: "07:00 ~ 18:00 (화요일 휴무 확인)",
+                signature: "직접 거품 내는 머랭 달걀덮밥(TKG), 전갱이 구이 정식, 말차 라떼",
+                note: "고쿠라쿠지역에서 도보 8분(이나무라가사키역 도보 2분). 철길 바로 옆 테라스에서 전차 구경 가능",
+                reviewSummary: "눈앞 수십 cm 거리로 에노덴이 지나가는 이색 풍경과 폭신한 머랭 계란덮밥으로 유명한 명소.",
+                googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Yoridokoro+Kamakura"
+              }
+            ]
+          },
+          {
+            step: 3,
+            name: "가마쿠라코코마에역 (슬램덩크 건널목)",
+            lat: 35.3067,
+            lng: 139.5023,
+            time: "14:40",
+            desc: "바다를 배경으로 에노덴 전차가 지나는 애니메이션 '슬램덩크' 성지 건널목 감상",
+            googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Kamakurakokomae+Station+Crossing",
+            spotDetail: {
+              access: "가마쿠라코코마에역 하차 후 동쪽(하세 방면) 도보 1분 첫 번째 건널목",
+              highlights: [
+                "반짝이는 쇼난 바다와 에노덴 열차가 한 프레임에 담기는 명장면 배경지",
+                "건널목 맞은편 계단을 내려가면 해안가 모래사장에서 에노시마 실루엣 조망 가능"
+              ],
+              reviewSummary: "인증샷 인파가 많으므로 차도 침범에 주의하고 역 승강장 끝에서 바라보는 바다 풍경도 함께 감상할 것."
+            },
+            transitToNext: {
+              line: "에노덴 (가마쿠라코코마에 → 에노시마) + 도보",
+              duration: "전철 4분 + 벤텐바시 도보 12~15분",
+              detail: "에노시마역 하차 후 스바나 거리와 해상 다리를 건너 섬 진입",
+              howToRide: [
+                "가마쿠라코코마에역에서 후지사와 방면 에노덴 탑승 → 2정거장(4분) 에노시마역 하차",
+                "스바나 상점가 거리를 직진해 지하보도 통과 후 '에노시마 벤텐바시(다리)'를 건너 에노시마 섬 진입"
+              ]
+            },
+            foods: []
+          },
+          {
+            step: 4,
+            name: "에노시마 & 시 캔들 전망대 (일몰·야경)",
+            lat: 35.2998,
+            lng: 139.4785,
+            time: "16:15",
+            desc: "에스카(에스컬레이터) 탑승 후 시 캔들 전망대에서 사가미만 일몰(17시 전후)·후지산·야경 감상",
+            googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Enoshima+Sea+Candle",
+            spotDetail: {
+              access: "에노시마 청동 토리이 통과 → 신사 입구 왼편 '에노시마 에스카(유료 에스컬레이터)' 탑승 후 정상 사무엘 코킹원 내 위치",
+              highlights: [
+                "1월 일몰(16:55 전후) 타이밍에 오르면 붉은 노을과 후지산 실루엣, 야간 조명까지 한 번에 감상",
+                "도쿄 복귀: 쇼난에노시마역(모노레일 14분) → 오후나역(JR 도카이도선/요코스카선 45분) → 신바시/하마마쓰초 복귀"
+              ],
+              reviewSummary: "계단이 많은 섬이므로 아이들과 함께라면 올라갈 때 에스카 이용을 추천. 해 질 녘 바닷바람이 강해 보온 철저히 준비."
+            },
+            transitToNext: null,
+            foods: [
+              {
+                rank: 1,
+                name: "토비초 본점 (Tobiccho)",
+                lat: 35.3016,
+                lng: 139.4819,
+                genre: "시라스 카이센동 전문점 (추천 1순위)",
+                budget: "1인 약 1,800 ~ 2,800엔",
+                hours: "11:00 ~ 20:00 (재료 소진 시 마감)",
+                signature: "토비초동(모듬 해산물 덮밥), 시라스 야채 튀김(카키아게) 덮밥",
+                note: "에노시마 다리 건너 청동 토리이 우측 인근. 대기 발생 시 입구 태블릿으로 번호표 먼저 발권",
+                reviewSummary: "에노시마 대표 해산물 덮밥 맛집으로 푸짐한 회와 바삭한 시라스 튀김이 어른과 아이 모두에게 인기가 높음.",
+                googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Tobiccho+Enoshima"
+              },
+              {
+                rank: 2,
+                name: "에노시마 코야 (Enoshima Koya)",
+                lat: 35.3082,
+                lng: 139.4832,
+                genre: "어부 요리 · 호로호로동 (추천 2순위)",
+                budget: "1인 약 1,500 ~ 2,500엔",
+                hours: "08:00 ~ 20:00 전후",
+                signature: "호로호로동(비법 된장 양념 활어회 덮밥), 신선한 생선구이 정식",
+                note: "에노시마 다리 건너기 직전 해안가 인근 위치. 아늑한 어부 오두막 분위기",
+                reviewSummary: "비법 된장 소스에 버무린 두툼한 회를 얹은 호로호로동과 숯불 생선구이가 일품인 해변 맛집.",
+                googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Enoshima+Koya"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        id: "day3",
+        label: "1/22(금) Day 3",
+        title: "1/22(금) 시부야(주술회전 6대 성지) & 하라주쿠(치이카와)",
+        subtitle: "야마노테선 직통 → 시부야 사변 성지순례 → 파르코 점프샵 → 하라주쿠 치이카와 랜드·베이커리",
+        stops: [
+          {
+            step: 0,
+            isHotel: true,
+            name: HOTEL_BASE.name,
+            lat: HOTEL_BASE.lat,
+            lng: HOTEL_BASE.lng,
+            time: "09:30",
+            desc: "JR 하마마쓰초역(JY28)에서 야마노테선 외선순환 탑승 후 시부야역(JY20)까지 직통 이동",
+            googleMapsUrl: HOTEL_BASE.googleMapsUrl,
+            spotDetail: {
+              access: "JR 하마마쓰초역 3번 홈(시나가와·시부야 방면) 탑승 → 8정거장(약 14분, IC 성인 208엔 · 소아 104엔)",
+              highlights: [
+                "환승 없이 한 번에 시부야역 하치코 출구 도착",
+                "오전 10시 전후 도착 시 스크램블 교차로와 성지 포토 스팟을 한결 여유롭게 촬영 가능"
+              ],
+              reviewSummary: "직통 14분 거리라 아침 준비 후 부담 없이 이동하기 최적."
+            },
+            transitToNext: {
+              line: "JR 야마노테선 외선순환 (JY28 하마마쓰초 → JY20 시부야)",
+              duration: "약 14분 (8정거장 / IC 성인 208엔)",
+              detail: "3번 승강장(시나가와·시부야·신주쿠 방면) 탑승",
+              howToRide: [
+                "JR 하마마쓰초역 개찰구 통과 후 3번 승강장(야마노테선 외선순환) 탑승",
+                "시나가와 → 오사키 → 고탄다 → 메구로 → 에비스 → 시부야역(8정거장) 하차",
+                "시부야역 하차 후 '하치코 개찰구(Hachiko Exit)'로 나오면 바로 스크램블 교차로 및 벽화 연결"
+              ]
+            },
+            foods: []
+          },
+          {
+            step: 1,
+            name: "시부야 주술회전 성지순례 (스크램블 · 109 · 히카리에 · 미야시타 파크)",
+            lat: 35.6595,
+            lng: 139.7004,
+            time: "10:00",
+            desc: "①스크램블 교차로 & 벽화 '내일의 신화' → ②SHIBUYA 109 & 도겐자카 → ③히카리에 B3F → ④미야시타 파크 옥상",
+            googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Shibuya+Hikarie+Tokyo",
+            spotDetail: {
+              access: "하치코 출구 앞 스크램블 교차로 & 109 조망 → 히카리에 B3F(도큐 도요코선 개찰구 앞 광장) → 미야시타 파크(도보 4분)",
+              highlights: [
+                "성지 ①·②: 스크램블 교차로 횡단 및 SHIBUYA 109 랜드마크 조망 (시부야 사변 오프닝·전투 배경)",
+                "성지 ③·④: 히카리에 B3F 지하 개찰구 앞 결전 무대 & 미야시타 파크 4층 옥상 잔디 공원(2기 엔딩 배경)"
+              ],
+              reviewSummary: "애니메이션 속 배경과 실제 도시 구조가 완벽히 일치해 아이들과 성지 비교 사진을 찍는 재미가 쏠쏠함."
+            },
+            transitToNext: {
+              line: "시부야 코엔도리(공원길) 도보 이동",
+              duration: "도보 약 7분",
+              detail: "미야시타 파크에서 모디(MODI) 앞 코엔도리를 따라 시부야 파르코로 이동",
+              howToRide: [
+                "미야시타 파크 남쪽 출구에서 스크램블 교차로 방면으로 나와 '시부야 모디(MODI)' 앞 코엔도리 직진",
+                "약 350m 완만한 오르막 이동 후 왼편 대형 유리 건물 '시부야 파르코(PARCO)' 도착"
+              ]
+            },
+            foods: [
+              {
+                rank: 1,
+                name: "츠루동탄 우동 누들 브라스리 시부야",
+                lat: 35.6584,
+                lng: 139.7022,
+                genre: "사누키 우동 · 고층 전망 (추천 1순위)",
+                budget: "1인 약 1,500 ~ 2,400엔",
+                hours: "11:00 ~ 23:00 (브레이크 타임 없음)",
+                signature: "명란 크림 우동, 스키야키 우동, 대왕 유부 우동 (면 추가 최대 3타마 무료)",
+                note: "시부야 스크램블 스퀘어 13층 위치. 11시 오픈 직후 방문하면 창가석 배정 확률 높음",
+                reviewSummary: "세숫대야 크기의 그릇과 쫄깃한 면발, 시부야 도심 전망을 갖춘 쾌적한 레스토랑으로 4인 가족 식사에 매우 적합.",
+                googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Tsurutontan+Udon+Noodle+Brasserie+Shibuya"
+              },
+              {
+                rank: 2,
+                name: "츠케멘 야스베 시부야점 (Yasubee)",
+                lat: 35.6599,
+                lng: 139.7026,
+                genre: "도쿄 정통 츠케멘 (추천 2순위)",
+                budget: "1인 약 1,000 ~ 1,300엔",
+                hours: "11:00 ~ 22:00 전후",
+                signature: "츠케멘, 매운맛 츠케멘 (보통·중·대 사이즈 동일 가격)",
+                note: "시부야역 동쪽 출구(미야마스자카 방면) 도보 3분. 식권 자판기 결제 후 카운터석 착석",
+                reviewSummary: "쫄깃하고 탱글한 굵은 면발을 감칠맛 진한 특제 육수에 찍어 먹는 도쿄 대표 츠케멘 맛집.",
+                googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Tsukemen+Yasubee+Shibuya"
+              }
+            ]
+          },
+          {
+            step: 2,
+            name: "시부야 파르코 6F 점프샵 & 애니메이트 시부야",
+            lat: 35.6620,
+            lng: 139.6987,
+            time: "13:00",
+            desc: "파르코 6층 'CYBERSPACE SHIBUYA'(점프샵·닌텐도 도쿄·포켓몬센터) 및 인근 애니메이트 쇼핑",
+            googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Shibuya+PARCO+6F+JUMP+SHOP",
+            spotDetail: {
+              access: "시부야 파르코 6층 (엘리베이터 이용) → 도보 3분 거리 '시부야 빔(BEAM)' 3층 애니메이트 연계",
+              highlights: [
+                "한 층에 점프샵(주술회전·귀멸의 칼날), 닌텐도 도쿄, 포켓몬센터 시부야, 캡콤 스토어가 모두 집결",
+                "5,500엔(세금 포함) 이상 구매 시 파르코 내 면세 카운터에서 세금 환급 가능 (단기체재 스티커가 붙은 실물 여권 필수)"
+              ],
+              reviewSummary: "아이들과 어른 모두 시간 가는 줄 모르는 도쿄 서브컬처 쇼핑의 핵심 스팟."
+            },
+            transitToNext: {
+              line: "캣스트리트(우라하라주쿠) 또는 메이지도리 도보 이동",
+              duration: "도보 약 14분 (약 1km)",
+              detail: "파르코에서 오모테산도·하라주쿠 방면 평지 산책",
+              howToRide: [
+                "파르코에서 메이지도리(큰길)로 나와 하라주쿠 방면 직진 또는 감성 골목 '캣스트리트' 경유",
+                "오모테산도 교차로 도착 시 '오모카도(도큐플라자)' 및 바로 뒷골목 '키디랜드 하라주쿠점' 인접"
+              ]
+            },
+            foods: []
+          },
+          {
+            step: 3,
+            name: "하라주쿠: 치이카와 랜드 & 치이카와 베이커리",
+            lat: 35.6686,
+            lng: 139.7056,
+            time: "15:00",
+            desc: "키디랜드 하라주쿠점 1층 '치이카와 랜드' 및 도큐플라자 오모카도 3층 '치이카와 베이커리' 방문",
+            googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Kiddy+Land+Harajuku+Chiikawa+Land",
+            spotDetail: {
+              access: "도쿄메트로 메이지진구마에역 4번 출구 도보 3분 / JR 하라주쿠역 오모테산도 출구 도보 7분",
+              highlights: [
+                "치이카와 랜드 하라주쿠점: 키디랜드 1층 위치, 일본 내 손꼽히는 규모와 다양한 인형·문구 구비",
+                "치이카와 베이커리(오모카도 3층): 캐릭터 얼굴 빵(사전 예약제 여부 확인) 및 굿즈 샵 운영"
+              ],
+              reviewSummary: "귀가 시 JR 하라주쿠역(JY19)에서 야마노테선 내선순환을 타면 환승 없이 16분 만에 하마마쓰초역(JY28) 직통 복귀 가능."
+            },
+            transitToNext: null,
+            foods: [
+              {
+                rank: 1,
+                name: "마이센 아오야마 본점 (Maisen)",
+                lat: 35.6673,
+                lng: 139.7112,
+                genre: "돈카츠 노포 (추천 1순위)",
+                budget: "1인 약 1,800 ~ 3,200엔",
+                hours: "11:00 ~ 21:00",
+                signature: "히레카츠(안심) 정식, 흑돼지 로스카츠 정식, 히레카츠 샌드위치",
+                note: "키디랜드에서 오모테산도 방면 도보 6분(애플스토어 옆 골목 안쪽). 옛 목욕탕을 개조한 넓은 공간",
+                reviewSummary: "젓가락으로도 잘릴 만큼 부드러운 돈카츠 명가로, 좌석이 넓고 친절해 가족 외식 만족도가 매우 높음.",
+                googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Tonkatsu+Maisen+Aoyama+Honten"
+              },
+              {
+                rank: 2,
+                name: "하라주쿠 교자루 (Harajuku Gyozaro)",
+                lat: 35.6682,
+                lng: 139.7068,
+                genre: "교자 · 중식 간편식 (추천 2순위)",
+                budget: "1인 약 800 ~ 1,300엔",
+                hours: "11:30 ~ 22:00",
+                signature: "야키교자(군만두), 스이교자(물만두), 숙주나물 고기볶음",
+                note: "키디랜드 바로 인근 뒷골목 위치. 합리적인 가격과 빠른 회전율",
+                reviewSummary: "오모테산도·하라주쿠 한복판에서 부담 없는 가격에 육즙 가득한 만두를 즐기기 좋은 가성비 맛집.",
+                googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Harajuku+Gyozaro"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        id: "day4",
+        label: "1/23(토) Day 4",
+        title: "1/23(토) 아사쿠사(귀멸 테마) & 도쿄 스카이트리 야경",
+        subtitle: "다이몬역 아사쿠사선 직통 → 센소지 & 문화관광센터 8층 → 스카이트리 소라마치 → 야간 에마키 셔터 벽화 & 록쿠 거리",
+        stops: [
+          {
+            step: 0,
+            isHotel: true,
+            name: HOTEL_BASE.name,
+            lat: HOTEL_BASE.lat,
+            lng: HOTEL_BASE.lng,
+            time: "10:00",
+            desc: "호텔 인근 도영 지하철 다이몬역(A09)에서 아사쿠사선 탑승 후 아사쿠사역(A18) 직통 이동",
+            googleMapsUrl: HOTEL_BASE.googleMapsUrl,
+            spotDetail: {
+              access: "도영 지하철 다이몬역(A09) 탑승 → 아사쿠사역(A18) 하차 (환승 없이 8정거장, 약 16분, IC 성인 220엔 · 소아 110엔)",
+              highlights: [
+                "JR이 아닌 '도영 지하철(Toei Subway)' 다이몬역 개찰구를 이용해야 환승 없이 직통 이동 가능",
+                "오후 노을(17:00)과 야간 셔터 벽화·라이트업(17:30~18:15)까지 연계하는 황금 동선"
+              ],
+              reviewSummary: "숙소에서 아사쿠사까지 16분 직통이라 이동 피로가 전혀 없음."
+            },
+            transitToNext: {
+              line: "도영 아사쿠사선 (A09 다이몬 → A18 아사쿠사)",
+              duration: "약 16분 (8정거장 / IC 성인 220엔)",
+              detail: "다이몬역 2번 승강장(아사쿠사·오시아게 방면) 탑승",
+              howToRide: [
+                "호텔에서 도보 4~5분 거리 도영 지하철 다이몬역(B4 출구 등) 지하 진입",
+                "도영 아사쿠사선 '아사쿠사·오시아게(스카이트리) 방면' 승강장에서 열차 탑승",
+                "신바시 → 히가시긴자 → 니혼바시 → 닌교초 → 아사쿠사역(A18) 하차 후 1번 출구(가미나리몬 방면) 이용"
+              ]
+            },
+            foods: []
+          },
+          {
+            step: 1,
+            name: "센소지 & 나카미세도리 · 아사쿠사 멘치 간식",
+            lat: 35.7148,
+            lng: 139.7967,
+            time: "10:30",
+            desc: "가미나리몬 통과 → 나카미세도리 길거리 간식(아사쿠사 멘치·메론빵) & 점심 식사 → 센소지 본당 참배 및 오미쿠지",
+            googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Senso-ji+Temple+Asakusa",
+            spotDetail: {
+              access: "아사쿠사역 1번 출구 도보 2분 가미나리몬 도착 → 나카미세도리 직진",
+              highlights: [
+                "나카미세도리 명물 '아사쿠사 멘치(멘치카츠 400엔)' 및 카게츠도 점보 메론빵 체험 (보행 중 취식 금지, 지정 구역 취식)",
+                "본당 앞 100엔 오미쿠지(운세 뽑기) 체험 (흉이 나오면 경내 지정 묶는 곳에 묶어두고 옴)"
+              ],
+              reviewSummary: "주말 낮에는 활기찬 일본 축제 분위기를 만끽할 수 있으며, 해 질 녘 야간 산책을 위해 오후에는 스카이트리를 먼저 다녀오는 동선이 효율적."
+            },
+            transitToNext: {
+              line: "스미다 리버워크 도보 산책 (또는 도부 스카이트리라인 1정거장)",
+              duration: "도보 약 15분 / 전철 3분",
+              detail: "스미다강 철교 옆 보행자 전용 다리 '스미다 리버워크' 이용",
+              howToRide: [
+                "센소지 동쪽 스미다 공원으로 이동 후 철교 바로 옆 보행자 전용 다리 '스미다 리버워크(07:00~22:00)' 횡단",
+                "다리를 건넌 뒤 '도쿄 미즈마치' 상점가 산책로를 따라 직진하면 도쿄 스카이트리 타운 도착"
+              ]
+            },
+            foods: [
+              {
+                rank: 1,
+                name: "요시카미 (Yoshikami)",
+                lat: 35.7135,
+                lng: 139.7932,
+                genre: "쇼와 경양식 노포 (추천 1순위)",
+                budget: "1인 약 1,800 ~ 3,200엔",
+                hours: "11:30 ~ 21:30 (목요일 휴무 확인)",
+                signature: "비프스튜, 오므라이스, 돈가스 조합, 하야시라이스",
+                note: "센소지 서쪽 록쿠 브로드웨이 인근 위치. 오픈(11:30) 전부터 줄이 서므로 이른 방문 또는 대기표 확인",
+                reviewSummary: "클래식한 쇼와 시대 분위기 속에서 진한 비프스튜와 부드러운 오므라이스를 맛볼 수 있는 아사쿠사 대표 양식당.",
+                googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Yoshikami+Asakusa"
+              },
+              {
+                rank: 2,
+                name: "야키소바 후쿠짱 (Fukuchan)",
+                lat: 35.7115,
+                lng: 139.7975,
+                genre: "철판 야키소바 노포 (추천 2순위)",
+                budget: "1인 약 600 ~ 1,000엔",
+                hours: "11:30 ~ 20:00 전후",
+                signature: "특제 소스 야키소바, 야키소바 + 계란후라이 토핑",
+                note: "아사쿠사역 직결 일본 최고(最古) 지하상가 내 위치. 레트로 로컬 감성",
+                reviewSummary: "불향 가득한 쫄깃한 야키소바를 매우 합리적인 가격에 즐길 수 있는 현지인 단골 노포.",
+                googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Yakisoba+Fukuchan+Asakusa"
+              },
+              {
+                rank: 3,
+                name: "아사쿠사 카게츠도 본점 (점보 메론빵)",
+                lat: 35.7145,
+                lng: 139.7954,
+                genre: "점보 메론빵 간식 (추천 3순위)",
+                budget: "1개 약 300 ~ 500엔",
+                hours: "10:00 ~ 17:00 전후 (수량 소진 시 마감)",
+                signature: "점보 메론빵, 아이스크림 메론빵",
+                note: "센소지 서쪽 니시산도 입구 위치. 회전율이 빨라 줄이 길어도 금방 구매 가능",
+                reviewSummary: "겉은 바삭하고 속은 솜사탕처럼 폭신한 아사쿠사 대표 간식.",
+                googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Asakusa+Kagetsudo+Honten"
+              }
+            ]
+          },
+          {
+            step: 2,
+            name: "도쿄 스카이트리 타운 (소라마치 점프샵 & 치이카와 랜드)",
+            lat: 35.7101,
+            lng: 139.8107,
+            time: "13:30",
+            desc: "소라마치 내 점프샵(귀멸의 칼날 공식 굿즈)과 치이카와 랜드 소라마치점 동시 쇼핑",
+            googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Tokyo+Solamachi+Tokyo+Skytree",
+            spotDetail: {
+              access: "도쿄 스카이트리 타운 소라마치 3~4층 캐릭터 구역",
+              highlights: [
+                "점프샵 소라마치점(4층)과 치이카와 랜드 소라마치점(3층)을 한 건물에서 편하게 쇼핑",
+                "16:30경 도부 스카이트리라인(1정거장) 또는 도보로 아사쿠사로 돌아가 노을·야경 감상 이어가기"
+              ],
+              reviewSummary: "실내가 넓고 쾌적해 오후 시간대 아이들과 굿즈 쇼핑 및 카페 휴식을 취하기 좋음."
+            },
+            transitToNext: {
+              line: "도부 스카이트리라인 (도쿄스카이트리역 → 아사쿠사역 1정거장)",
+              duration: "전철 약 3분 (또는 스미다 리버워크 도보 15분)",
+              detail: "17:00 매직아워(일몰)에 맞춰 아사쿠사 문화관광센터 8층 전망대로 이동",
+              howToRide: [
+                "도쿄스카이트리역에서 아사쿠사 방면 열차 탑승 → 1정거장(3분) 아사쿠사역 하차",
+                "가미나리몬 맞은편 '아사쿠사 문화관광센터' 엘리베이터로 8층 무료 야외 전망 테라스 이동"
+              ]
+            },
+            foods: []
+          },
+          {
+            step: 3,
+            name: "아사쿠사 문화관광센터 8층 노을 & 야간 셔터 벽화 · 록쿠 거리",
+            lat: 35.7109,
+            lng: 139.7963,
+            time: "17:00",
+            desc: "①8층 무료 전망대 매직아워 노을(17:00~17:30) → ②18시 폐점 후 펼쳐지는 '아사쿠사 에마키' 셔터 역사 벽화 & 호조몬·오층탑 주홍빛 야경 → ③귀멸 감성 아사쿠사 록쿠 거리 저녁",
+            googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Asakusa+Culture+Tourist+Information+Center",
+            spotDetail: {
+              access: "가미나리몬 맞은편 아사쿠사 문화관광센터 8층(무료, 09:00~22:00) → 나카미세도리 야간 산책 → 센소지 서쪽 문 통과 후 록쿠 흥행가",
+              highlights: [
+                "17:00~17:30: 나카미세도리~오층탑~본당과 스카이트리 노을이 한눈에 내려다보이는 최고의 무료 포토존",
+                "17:30~18:15: 상점 셔터가 닫히며 드러나는 250m 에도 풍속화 셔터 벽화와 주홍빛 라이트업 야경 (다이쇼·에도 분위기 극대화)",
+                "18:15~19:15: 센소지 서쪽 문 → 일본 최고 유원지 하나야시키 담벼락 골목 → 록쿠 브로드웨이 레트로 거리 탐방 후 아사쿠사역(A18)에서 다이몬역(A09) 16분 직통 복귀"
+              ],
+              reviewSummary: "낮의 혼잡함이 사라진 18시 이후의 센소지와 록쿠 거리는 귀멸의 칼날 속 다이쇼 시대 분위기가 가장 짙게 살아나는 하이라이트 코스."
+            },
+            transitToNext: null,
+            foods: [
+              {
+                rank: 1,
+                name: "아사쿠사 이마한 본점 / 록쿠 거리 노포 식당가",
+                lat: 35.7131,
+                lng: 139.7928,
+                genre: "스키야키 · 에도 전통 저녁 식사 (추천 1순위)",
+                budget: "저녁 코스 5,000엔~ / 록쿠 거리 식당 1,500~2,500엔",
+                hours: "11:30 ~ 21:30",
+                signature: "흑모와규 스키야키, 규동, 꼬치·전골 요리",
+                note: "센소지 서쪽 니시산도 및 록쿠 브로드웨이 일대에 가족이 함께 들어가기 좋은 전통 식당과 몬자야키·텐동 가게가 밀집해 있음",
+                reviewSummary: "아사쿠사의 밤 조명 아래에서 하루 일정을 마무리하며 든든하게 저녁을 즐기기 좋은 미식 구역.",
+                googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Asakusa+Rokku+Broadway+Restaurants"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        id: "day5",
+        label: "1/24(일) Day 5",
+        title: "1/24(일) 오차노미즈('스즈메' 성지) · 아키하바라 · 오다이바 야경",
+        subtitle: "시내 애니메이션 성지 & 피규어·가챠 투어 + 도쿄만 자유의 여신상·건담 야경",
+        stops: [
+          {
+            step: 0,
+            isHotel: true,
+            name: HOTEL_BASE.name,
+            lat: HOTEL_BASE.lat,
+            lng: HOTEL_BASE.lng,
+            time: "09:40",
+            desc: "JR 하마마쓰초역(JY28)에서 야마노테선 내선순환 탑승 후 아키하바라역(JY03) 직통 이동",
+            googleMapsUrl: HOTEL_BASE.googleMapsUrl,
+            spotDetail: {
+              access: "JR 하마마쓰초역 2번 홈(도쿄·우에노 방면) 탑승 → 5정거장(약 10분, IC 성인 167엔 · 소아 83엔)",
+              highlights: [
+                "환승 없이 10분 만에 아키하바라역 도착 후 도보로 오차노미즈 히지리바시까지 바로 연계 가능"
+              ],
+              reviewSummary: "도쿄 도심 북동부 핵심 스팟들을 최소 이동 시간으로 묶은 여유로운 5일 차 코스."
+            },
+            transitToNext: {
+              line: "JR 야마노테선 내선순환 (JY28 하마마쓰초 → JY03 아키하바라)",
+              duration: "약 10분 (5정거장 / IC 성인 167엔)",
+              detail: "아키하바라역 전자상가 출구(Electric Town Exit) 하차 후 만세이바시 방면 도보 7분",
+              howToRide: [
+                "JR 하마마쓰초역 2번 승강장에서 야마노테선 도쿄·우에노 방면 탑승 → 5정거장 후 아키하바라역 하차",
+                "전자상가 출구로 나와 칸다강 만세이바시 다리를 건너 언덕길을 따라 도보 7분 오르면 '히지리바시' 도착"
+              ]
+            },
+            foods: []
+          },
+          {
+            step: 1,
+            name: "오차노미즈 히지리바시 ('스즈메의 문단속' 성지)",
+            lat: 35.6997,
+            lng: 139.7652,
+            time: "10:15",
+            desc: "신칸센·추오선·마루노우치선 전철 3개 노선이 교차하는 도쿄 최고 철도 포토 스팟",
+            googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Hijiribashi+Bridge+Ochanomizu",
+            spotDetail: {
+              access: "JR 오차노미즈역 히지리바시 출구 바로 앞 / 아키하바라역에서 도보 7~8분",
+              highlights: [
+                "애니메이션 '스즈메의 문단속'에서 스즈메가 문을 닫기 위해 뛰어내리던 다리 배경지",
+                "다리 난간 위에서 주황색 추오선과 빨간색 지하철 마루노우치선이 동시에 교차하는 순간 포착 가능"
+              ],
+              reviewSummary: "철도 팬과 애니메이션 팬 모두에게 인기 높은 도쿄 도심 속 숨은 명소."
+            },
+            transitToNext: {
+              line: "칸다강변 아키하바라 전자상가 도보 복귀",
+              duration: "도보 약 7분",
+              detail: "히지리바시에서 아키하바라역 전자상가(라디오회관·요도바시) 방면으로 내리막 이동",
+              howToRide: [
+                "히지리바시에서 칸다묘진 방면으로 내려와 아키하바라 메인 거리(추오도리) 진입"
+              ]
+            },
+            foods: [
+              {
+                rank: 1,
+                name: "칸다 야부소바 (Kanda Yabusoba)",
+                lat: 35.6976,
+                lng: 139.7688,
+                genre: "140년 전통 메밀국수 노포 (추천 1순위)",
+                budget: "1인 약 1,200 ~ 2,200엔",
+                hours: "11:30 ~ 20:00 (수요일 휴무 확인)",
+                signature: "세이로 소바(찬 메밀국수), 텐푸라 소바, 계란말이(다시마키)",
+                note: "히지리바시와 아키하바라 중간 지점 위치. 고풍스러운 목조 정원 건물에서 즐기는 전통 소바",
+                reviewSummary: "1880년 창업한 도쿄 3대 소바 노포 중 하나로, 깔끔한 육수와 정통 일본 가옥 정원 분위기가 일품.",
+                googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Kanda+Yabusoba"
+              }
+            ]
+          },
+          {
+            step: 2,
+            name: "아키하바라 피규어 · 가챠(캡슐토이) 투어",
+            lat: 35.6984,
+            lng: 139.7731,
+            time: "12:30",
+            desc: "아키하바라 라디오회관(10층 규모 피규어·굿즈 빌딩) & 요도바시 아키바 가챠·장난감 층 탐방",
+            googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Akihabara+Radio+Kaikan",
+            spotDetail: {
+              access: "JR 아키하바라역 전자상가 출구 바로 앞(라디오회관) 및 쇼와도리 출구 앞(요도바시 아키바 6층)",
+              highlights: [
+                "라디오회관: 귀멸의 칼날·주술회전·치이카와 피규어 및 아크릴 굿즈 전문 매장 집결",
+                "요도바시 아키바 6층: 수백 대의 가챠(캡슐토이) 머신과 프라모델·게임 코너가 있어 초5·중1 아이들 만족도 최상"
+              ],
+              reviewSummary: "일요일 오후 아키하바라 메인 거리(추오도리)는 보행자 천국(차 없는 거리)으로 운영되어 걷기 더욱 쾌적함."
+            },
+            transitToNext: {
+              line: "JR 야마노테선(아키하바라 → 신바시 8분) → 유리카모메 모노레일(다이바 15분)",
+              duration: "총 약 28분",
+              detail: "신바시역에서 무인 모노레일 '유리카모메' 환승 후 레인보우 브릿지 횡단",
+              howToRide: [
+                "1단계: JR 아키하바라역에서 야마노테선 외선순환(도쿄·시나가와 방면) 탑승 → 4정거장(8분) 신바시역(JY29) 하차",
+                "2단계: 신바시역 시오도메 출구로 나와 유리카모메(Yurikamome) 신바시역 개찰구 진입 (스이카 사용 가능)",
+                "3단계: 맨 앞칸에 타면 레인보우 브릿지를 건너는 파노라마 뷰 감상 가능 → 약 15분 후 '다이바역(U07)' 하차"
+              ]
+            },
+            foods: []
+          },
+          {
+            step: 3,
+            name: "오다이바 해변공원 · 자유의 여신상 & 실물 크기 건담 야경",
+            lat: 35.6254,
+            lng: 139.7755,
+            time: "16:30",
+            desc: "레인보우 브릿지·자유의 여신상 일몰 야경 감상 및 다이버시티 도쿄 플라자 실물 크기 유니콘 건담 관람",
+            googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=DiverCity+Tokyo+Plaza+Unicorn+Gundam",
+            spotDetail: {
+              access: "유리카모메 다이바역 도보 3분(자유의 여신상) → 도보 6분(다이버시티 도쿄 플라자 페스티벌 광장)",
+              highlights: [
+                "17:00 전후 레인보우 브릿지와 도쿄 타워가 함께 보이는 오다이바 야경 명소",
+                "다이버시티 광장 실물 크기 유니콘 건담 변신 연출(17:00 이후 야간 조명 라이트업) 관람 후 유리카모메로 신바시역 복귀(하마마쓰초 1정거장)"
+              ],
+              reviewSummary: "도쿄 마지막 밤을 화려한 야경과 쇼핑몰 내 쾌적한 저녁 식사로 마무리하기 완벽한 코스."
+            },
+            transitToNext: null,
+            foods: [
+              {
+                rank: 1,
+                name: "다이버시티 도쿄 플라자 6층 식당가 / 푸드코트",
+                lat: 35.6251,
+                lng: 139.7757,
+                genre: "함바그 · 텐동 · 회전초밥 복합 미식 (추천 1순위)",
+                budget: "1인 약 1,200 ~ 2,500엔",
+                hours: "11:00 ~ 22:00",
+                signature: "카네코 한노스케 텐동(2층 푸드코트), 함바그·스테이크 전문점(6층)",
+                note: "건담 광장 바로 위층에 위치해 바닷바람을 피해 따뜻하고 쾌적하게 가족 저녁 식사 가능",
+                reviewSummary: "좌석이 넓고 메뉴 선택지가 다양해 4인 가족이 각자 원하는 메뉴를 편하게 고를 수 있음.",
+                googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=DiverCity+Tokyo+Plaza+Restaurants"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        id: "day6",
+        label: "1/25(월) Day 6",
+        title: "1/25(월) 도쿄타워 · 시바공원 산책 & 하네다 공항 귀국",
+        subtitle: "체크아웃(짐 보관) → 도보권 조조지 & 도쿄타워 포토존 → 모노레일 직통 하네다 공항",
+        stops: [
+          {
+            step: 0,
+            isHotel: true,
+            name: HOTEL_BASE.name,
+            lat: HOTEL_BASE.lat,
+            lng: HOTEL_BASE.lng,
+            time: "09:30",
+            desc: "체크아웃 후 호텔 프런트에 캐리어 보관, 도보권 시바공원·조조지·도쿄타워 오전 산책 출발",
+            googleMapsUrl: HOTEL_BASE.googleMapsUrl,
+            spotDetail: {
+              access: "호텔에서 서쪽 다이몬 교차로 방면으로 직진 도보 10~15분이면 조조지와 도쿄타워 도착",
+              highlights: [
+                "마지막 날 전철을 타지 않고 호텔 주변 도보 산책만으로 도쿄의 상징 도쿄타워를 여유롭게 감상 가능",
+                "교통카드(Welcome Suica / 어린이 My Suica) 잔액은 공항 이동 전 편의점이나 공항 면세점·자판기에서 소진 권장"
+              ],
+              reviewSummary: "하마마쓰초 거점 숙소만의 최대 장점을 살린 여유로운 마지막 날 오전 코스."
+            },
+            transitToNext: {
+              line: "다이몬 거리 직진 도보 산책",
+              duration: "도보 약 12분",
+              detail: "다이몬 큰 문(붉은 기둥)을 지나 조조지 사찰 경내를 통과하면 도쿄타워 정면 도착",
+              howToRide: [
+                "호텔에서 나와 다이몬역 교차로의 큰 붉은 문(다이몬) 방향으로 직진",
+                "조조지(Zojo-ji) 경내에 들어서면 고풍스러운 사찰 지붕 뒤로 붉은 도쿄타워가 솟아 있는 대표 포토 스팟 등장"
+              ]
+            },
+            foods: []
+          },
+          {
+            step: 1,
+            name: "조조지 사찰 & 도쿄타워 (시바공원 포토 스팟)",
+            lat: 35.6586,
+            lng: 139.7454,
+            time: "10:00",
+            desc: "전통 사찰 조조지와 도쿄타워가 겹치는 인생샷 포인트 및 도쿄타워 전망대·풋타운 기념품 쇼핑",
+            googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Tokyo+Tower+Shiba+Park",
+            spotDetail: {
+              access: "시바공원 · 조조지 경내 도보 3분 도쿄타워 풋타운(1~5층) 연결",
+              highlights: [
+                "조조지 본당 앞 계단 및 시바공원 4호지 벤치 구역이 도쿄타워 촬영 명당",
+                "도쿄타워 풋타운 내 공식 기념품 샵에서 도쿄 바나나·도쿄타워 한정 과자 구매 가능"
+              ],
+              reviewSummary: "오전 햇살 아래 선명한 주홍빛 도쿄타워를 가장 한적하게 감상할 수 있는 시간대."
+            },
+            transitToNext: {
+              line: "호텔 복귀(도보 12분) → 하마마쓰초역 도쿄 모노레일 직통 탑승",
+              duration: "도보 12분 + 모노레일 13~18분",
+              detail: "항공편 출발 최소 2시간 30분 전까지 하네다 공항 제3터미널 도착 권장",
+              howToRide: [
+                "호텔 프런트에서 보관한 캐리어 수령 후 JR 하마마쓰초역 인접 '도쿄 모노레일(Tokyo Monorail)' 개찰구 진입",
+                "공항쾌속(Haneda Express) 또는 구간쾌속 탑승 → 환승 없이 13~18분 만에 하네다 공항 제3터미널역 도착",
+                "어린이용 My Suica(보증금 500엔) 환불을 원할 경우 하네다 공항 JR 동일본 여행서비스센터에서 반납 가능 (Welcome Suica는 보증금 0원이므로 기념 소장)"
+              ]
+            },
+            foods: [
+              {
+                rank: 1,
+                name: "하마마쓰초 · 다이몬역 인근 소바/규동·정식 거리",
+                lat: 35.6558,
+                lng: 139.7548,
+                genre: "일본 가정식 · 우동/돈카츠 (추천 1순위)",
+                budget: "1인 약 900 ~ 1,600엔",
+                hours: "11:00 ~ 21:00",
+                signature: "가츠동 정식, 자루소바, 함바그 정식",
+                note: "도쿄타워에서 호텔로 돌아오는 다이몬역 교차로 주변에 깔끔한 직장인 대상 정식집과 우동집이 많음",
+                reviewSummary: "관광지 가격 대비 합리적이고 회전이 빨라 공항 출발 전 든든하게 마지막 식사를 해결하기 좋음.",
+                googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Daimon+Station+Restaurants+Tokyo"
+              }
+            ]
+          },
+          {
+            step: 2,
+            name: "하네다 공항 제3터미널 (출국 수속 & 면세점)",
+            lat: 35.5440,
+            lng: 139.7676,
+            time: "13:00",
+            desc: "도쿄 모노레일 하차 후 출국 수속, 스이카 잔액 소진 및 면세점 기념품 구매 후 귀국",
+            googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=Haneda+Airport+Terminal+3",
+            spotDetail: {
+              access: "도쿄 모노레일 하네다 공항 제3터미널역 하차 즉시 3층 국제선 출발 로비 연결",
+              highlights: [
+                "출국장 내 면세점(로이스 초콜릿, 시로이 코이비토, 도쿄 바나나 등)에서 남은 엔화 및 스이카 잔액 결제 가능",
+                "면세 구매 물품은 출국 전까지 개봉하지 않도록 주의"
+              ],
+              reviewSummary: "하마마쓰초역에서 모노레일로 15분 내외면 도착하므로 마지막 날까지 시간 낭비 없이 알차게 여행을 마무리할 수 있음."
+            },
+            transitToNext: null,
+            foods: []
+          }
+        ]
+      }
+    ];
+
+    // 지도 초기화 (공식 OpenStreetMap 타일 - API 키 불필요)
+    const map = L.map('map').setView([35.6762, 139.7503], 12);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19
+    }).addTo(map);
+
+    const spotLayer = L.layerGroup().addTo(map);
+    const routeLayer = L.layerGroup().addTo(map);
+    const foodLayer = L.layerGroup().addTo(map);
+
+    let currentDayId = ITINERARY_DATA[0].id;
+    let showRouteOrder = false;
+    let showFoodMarkers = false;
+    let markerRegistry = {};
+
+    // 상단 날짜 탭 생성
+    const dateTabsEl = document.getElementById('dateTabs');
+    ITINERARY_DATA.forEach(day => {
+      const btn = document.createElement('button');
+      btn.className = 'date-btn' + (day.id === currentDayId ? ' active' : '');
+      btn.textContent = day.label;
+      btn.addEventListener('click', () => {
+        currentDayId = day.id;
+        document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderDay(true);
+      });
+      dateTabsEl.appendChild(btn);
+    });
+
+    // 순서표현 토글
+    const btnRouteOrder = document.getElementById('btnRouteOrder');
+    btnRouteOrder.addEventListener('click', () => {
+      showRouteOrder = !showRouteOrder;
+      btnRouteOrder.classList.toggle('active-route', showRouteOrder);
+      btnRouteOrder.textContent = showRouteOrder ? '🧭 순서표현 ON' : '🧭 순서표현 OFF';
+      renderDay(false);
+    });
+
+    // 음식점 핀 토글
+    const btnFoodToggle = document.getElementById('btnFoodToggle');
+    btnFoodToggle.addEventListener('click', () => {
+      showFoodMarkers = !showFoodMarkers;
+      btnFoodToggle.classList.toggle('active-food', showFoodMarkers);
+      btnFoodToggle.textContent = showFoodMarkers ? '🍽️ 음식점 핀 ON' : '🍽️ 음식점 핀 OFF';
+      renderDay(false);
+    });
+
+    // 입국·스이카·준비물 가이드 버튼
+    const btnPrepGuide = document.getElementById('btnPrepGuide');
+    btnPrepGuide.addEventListener('click', () => {
+      showPrepGuide(true);
+    });
+
+    // 상세창 하이라이트 및 모바일/태블릿 자동 스크롤 헬퍼
+    function focusDetailDrawer(shouldScroll = false) {
+      const drawer = document.getElementById('detailDrawer');
+      drawer.classList.remove('flash');
+      void drawer.offsetWidth; // reflow
+      drawer.classList.add('flash');
+      setTimeout(() => drawer.classList.remove('flash'), 600);
+
+      if (shouldScroll) {
+        drawer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+
+    // 입국 수속 · 교통카드(Welcome Suica & 어린이 My Suica) · 준비물 가이드
+    function showPrepGuide(shouldScroll = false) {
+      const drawer = document.getElementById('detailDrawer');
+      drawer.innerHTML = `
+        <div class="detail-header">
+          <div>
+            <span class="detail-badge badge-prep">여행 전 & 공항 도착 필수 체크리스트 (성인 3 · 초5 1명)</span>
+            <div class="detail-title">🛂 하네다 입국 · 교통카드(스이카) 발급 · 필수 준비물 가이드</div>
+          </div>
+          <a class="gmap-btn" href="https://www.google.com/maps/search/?api=1&query=Haneda+Airport+Terminal+3+JR+East+Travel+Service+Center" target="_blank" rel="noopener noreferrer">
+            📍 하네다 JR 센터 위치 ↗
+          </a>
+        </div>
+        <div class="detail-grid">
+          <div class="detail-box">
+            <h4>💳 교통카드 발급 (성인 3장 vs 초5 어린이 1장)</h4>
+            <ul class="detail-list">
+              <li><strong>성인 3명(중1 포함) — Welcome Suica:</strong> 도쿄 모노레일/JR 개찰구 부근 빨간색 전용 발매기에서 발급 (보증금 0원, 28일간 유효, 1인 2,000엔 충전 권장, 잔액 환불 불가).</li>
+              <li><strong>어린이 1명(만 6~12세 초5) — 어린이용 My Suica:</strong> 하네다 공항 'JR 동일본 여행서비스센터' 유인 창구에서 <strong>어린이 실물 여권</strong> 제시 후 신청서 작성 (2,000엔 = 보증금 500엔 + 충전 1,500엔, 모든 대중교통 50% 반값 자동 할인).</li>
+              <li><strong>추가 충전:</strong> 신용카드 충전 불가하므로 지하철/JR 발매기 또는 편의점('스이카 차-지 오네가이시마스')에서 1,000엔 단위 <strong>현금 충전</strong> 필수.</li>
+            </ul>
+          </div>
+          <div class="detail-box transit-theme">
+            <h4>🛂 하네다 공항 입국 5단계 요약</h4>
+            <ul class="detail-list">
+              <li><strong>STEP 1~2:</strong> Visit Japan Web(VJW) 통합 QR코드 준비 → 지문·안면 등록 키오스크 통과.</li>
+              <li><strong>STEP 3:</strong> 외국인 대면 심사 부스에서 여권 + QR 스캔 후 여권에 <strong>[단기체재 90일] 상륙허가 스티커</strong> 부착 확인 (백화점·돈키호테 면세 시 필수!).</li>
+              <li><strong>STEP 4~5:</strong> 수하물 태그 번호 대조 후 캐리어 수취 → 세관 전자 게이트에서 여권·QR 스캔 후 통과.</li>
+            </ul>
+          </div>
+          <div class="detail-box" style="grid-column: 1 / -1;">
+            <h4>🎒 가족 필수 준비물 & 결제 팁</h4>
+            <ul class="detail-list">
+              <li><strong>결제 & 환전:</strong> 도쿄 시내는 카드(트래블월렛/트래블로그 등 해외원화결제 DCC 차단 설정) 70% + 엔화 현금 30% 권장. 라멘 자판기·노포·가챠·오미쿠지용 <strong>지퍼형 동전지갑</strong> 필수.</li>
+              <li><strong>통신 & 전원:</strong> 일본 eSIM(일 2~3GB 또는 총 10~15GB) 출국 전 QR 등록 / 보조배터리 및 멀티포트 고속 충전기.</li>
+              <li><strong>복장:</strong> 1월 도쿄 및 가마쿠라·에노시마 바닷바람 대비 히트텍, 목도리, 핫팩, 편안한 워킹화(일 평균 1.5만 보) 필수.</li>
+            </ul>
+          </div>
+        </div>
+      `;
+      focusDetailDrawer(shouldScroll);
+    }
+
+    // 상세 정보 드로어 렌더링 (관광지/숙소 클릭 시)
+    function showSpotDetail(stop, prevStop, shouldScroll = false) {
+      const drawer = document.getElementById('detailDrawer');
+      const badgeText = stop.isHotel ? '거점 숙소 상세 안내' : `동선 ${stop.step}번 상세 안내 · ${stop.time}`;
+
+      let arrivalTransitHtml = '';
+      if (prevStop && prevStop.transitToNext) {
+        const t = prevStop.transitToNext;
+        arrivalTransitHtml = `
+          <div class="detail-box transit-theme">
+            <h4>🚆 이전 장소(${prevStop.isHotel ? '거점 숙소' : prevStop.step + '번'})에서 전철/도보 이동법</h4>
+            <ul class="detail-list">
+              <li><strong>이용 노선:</strong> ${t.line} (${t.duration})</li>
+              ${(t.howToRide || []).map(stepText => `<li>${stepText}</li>`).join('')}
+            </ul>
+          </div>
+        `;
+      } else if (stop.transitToNext) {
+        const t = stop.transitToNext;
+        arrivalTransitHtml = `
+          <div class="detail-box transit-theme">
+            <h4>🚆 다음 장소(1번)로 출발하는 전철 타는 법</h4>
+            <ul class="detail-list">
+              <li><strong>이용 노선:</strong> ${t.line} (${t.duration})</li>
+              ${(t.howToRide || []).map(stepText => `<li>${stepText}</li>`).join('')}
+            </ul>
+          </div>
+        `;
+      }
+
+      const sd = stop.spotDetail || {};
+      const nearbyFoodsHtml = (stop.foods && stop.foods.length > 0)
+        ? `<div class="detail-box food-theme" style="grid-column: 1 / -1;">
+            <h4>🍽️ 이 장소 근처 추천순 음식점 바로보기 (클릭 시 식당 상세/리뷰 표시)</h4>
+            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:6px;">
+              ${stop.foods.map(f => `
+                <button type="button" onclick="selectFoodByCode('${stop.step}-${f.rank}')" style="background:#fff7ed; border:1px solid #fdba74; color:#9a3412; padding:6px 10px; border-radius:7px; font-size:0.8rem; font-weight:700; cursor:pointer;">
+                  [${stop.step}-${f.rank}] ${f.name} · ${f.genre} ↗
+                </button>
+              `).join('')}
+            </div>
+          </div>`
+        : '';
+
+      drawer.innerHTML = `
+        <div class="detail-header">
+          <div>
+            <span class="detail-badge badge-spot">${badgeText}</span>
+            <div class="detail-title">${stop.name}</div>
+          </div>
+          <a class="gmap-btn" href="${stop.googleMapsUrl}" target="_blank" rel="noopener noreferrer">
+            📍 구글맵에서 열기
+          </a>
+        </div>
+        <div class="detail-grid">
+          <div class="detail-box">
+            <h4>📍 출구 · 접근 방법 & 핵심 관람 포인트</h4>
+            <ul class="detail-list">
+              <li><strong>찾아가는 길:</strong> ${sd.access || stop.desc}</li>
+              ${(sd.highlights || []).map(h => `<li>${h}</li>`).join('')}
+            </ul>
+          </div>
+          ${arrivalTransitHtml}
+          <div class="detail-box" style="grid-column: 1 / -1;">
+            <h4>💬 방문자 리뷰 종합 & 실전 팁</h4>
+            <p style="font-size:0.84rem; color:#334155;">${sd.reviewSummary || stop.desc}</p>
+          </div>
+          ${nearbyFoodsHtml}
+        </div>
+      `;
+      focusDetailDrawer(shouldScroll);
+    }
+
+    // 상세 정보 드로어 렌더링 (음식점 클릭 시)
+    function showFoodDetail(stop, food, shouldScroll = false) {
+      const drawer = document.getElementById('detailDrawer');
+      const code = `${stop.step}-${food.rank}`;
+      drawer.innerHTML = `
+        <div class="detail-header">
+          <div>
+            <span class="detail-badge badge-food">동선 ${stop.step}번 근처 · 추천 ${food.rank}순위 (${code})</span>
+            <div class="detail-title">${food.name}</div>
+          </div>
+          <a class="gmap-btn" href="${food.googleMapsUrl}" target="_blank" rel="noopener noreferrer">
+            📍 구글맵에서 열기 (리뷰·영업시간 확인)
+          </a>
+        </div>
+        <div class="detail-grid">
+          <div class="detail-box food-theme">
+            <h4>🍜 매장 핵심 정보 & 대표 메뉴</h4>
+            <ul class="detail-list">
+              <li><strong>장르 / 순위:</strong> ${food.genre}</li>
+              <li><strong>대표 메뉴:</strong> ${food.signature}</li>
+              <li><strong>예상 예산:</strong> ${food.budget}</li>
+              <li><strong>영업시간:</strong> ${food.hours}</li>
+            </ul>
+          </div>
+          <div class="detail-box">
+            <h4>💡 위치 안내 & 방문 꿀팁</h4>
+            <ul class="detail-list">
+              <li><strong>연계 관광지:</strong> 동선 ${stop.step}번 (${stop.name}) 인근</li>
+              <li><strong>이용 팁:</strong> ${food.note}</li>
+            </ul>
+          </div>
+          <div class="detail-box" style="grid-column: 1 / -1;">
+            <h4>⭐ 방문자 리뷰 종합 요약</h4>
+            <div class="review-pill">여행자 & 현지 리뷰 핵심 요약</div>
+            <p style="font-size:0.85rem; color:#334155;">${food.reviewSummary}</p>
+          </div>
+        </div>
+      `;
+      focusDetailDrawer(shouldScroll);
+    }
+
+    // 전역 헬퍼 (상세 패널 내 식당 버튼 클릭 연동)
+    window.selectFoodByCode = function(code) {
+      const dayData = ITINERARY_DATA.find(d => d.id === currentDayId);
+      if (!dayData) return;
+      const [stepStr, rankStr] = code.split('-');
+      const stop = dayData.stops.find(s => String(s.step) === stepStr);
+      if (!stop) return;
+      const food = (stop.foods || []).find(f => String(f.rank) === rankStr);
+      if (!food) return;
+
+      if (!showFoodMarkers) {
+        showFoodMarkers = true;
+        btnFoodToggle.classList.add('active-food');
+        btnFoodToggle.textContent = '🍽️ 음식점 핀 ON';
+        renderDay(false);
+      }
+      map.setView([food.lat, food.lng], 16);
+      const m = markerRegistry[`food-${code}`];
+      if (m) m.openPopup();
+      showFoodDetail(stop, food, true);
+    };
+
+    // 메인 렌더링 함수
+    function renderDay(fitBounds = true) {
+      const dayData = ITINERARY_DATA.find(d => d.id === currentDayId);
+      if (!dayData) return;
+
+      document.getElementById('dayTitle').textContent = dayData.title;
+      document.getElementById('daySubtitle').textContent = dayData.subtitle;
+
+      spotLayer.clearLayers();
+      routeLayer.clearLayers();
+      foodLayer.clearLayers();
+      markerRegistry = {};
+
+      const timelineList = document.getElementById('timelineList');
+      timelineList.innerHTML = '';
+
+      const boundsPoints = [];
+
+      dayData.stops.forEach((stop, idx) => {
+        const prevStop = idx > 0 ? dayData.stops[idx - 1] : null;
+        const coord = [stop.lat, stop.lng];
+        boundsPoints.push(coord);
+
+        // 1. 지도에 스팟 마커 생성
+        const pinClass = stop.isHotel ? 'custom-pin pin-hotel' : 'custom-pin pin-spot';
+        const pinLabel = stop.isHotel ? '숙' : stop.step;
+        const icon = L.divIcon({
+          className: '',
+          html: `<div class="${pinClass}">${pinLabel}</div>`,
+          iconSize: [30, 30],
+          iconAnchor: [15, 15],
+          popupAnchor: [0, -14]
+        });
+
+        const marker = L.marker(coord, { icon }).addTo(spotLayer);
+        marker.bindPopup(`
+          <div style="min-width:210px; font-family:sans-serif;">
+            <div style="font-size:11px; font-weight:700; color:#1e3a8a;">${stop.isHotel ? '거점 숙소' : '동선 ' + stop.step + '번'} · ${stop.time}</div>
+            <div style="font-size:14px; font-weight:800; margin:2px 0 4px;">${stop.name}</div>
+            <div style="font-size:12px; color:#475569; margin-bottom:6px;">${stop.desc}</div>
+            <a href="${stop.googleMapsUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block; font-size:11px; font-weight:700; color:#1a73e8; text-decoration:none;">📍 구글맵에서 열기 ↗</a>
+          </div>
+        `);
+
+        // 2. 좌측 타임라인 카드 생성
+        const card = document.createElement('div');
+        card.className = 'spot-card';
+        card.innerHTML = `
+          <div class="spot-top">
+            <span class="step-num ${stop.isHotel ? 'hotel' : ''}">${stop.isHotel ? '숙' : stop.step}</span>
+            <span class="spot-title">${stop.name}</span>
+            <span class="spot-time">${stop.time}</span>
+          </div>
+          <div class="spot-desc">${stop.desc}</div>
+          <div class="spot-actions">
+            <button type="button" class="detail-open-btn">📖 상세 전철법 · 리뷰 보기</button>
+            <a href="${stop.googleMapsUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" style="font-size:0.75rem; font-weight:700; color:#1a73e8; text-decoration:none;">구글맵 ↗</a>
+          </div>
+        `;
+
+        // 카드 및 상세 버튼 클릭 핸들러 (이벤트 버블링/모바일 터치 완벽 대응)
+        const handleSpotSelect = (e) => {
+          if (e && e.target && e.target.closest('a')) return;
+          document.querySelectorAll('.spot-card').forEach(c => c.classList.remove('selected'));
+          card.classList.add('selected');
+          map.setView(coord, Math.max(map.getZoom(), 14));
+          marker.openPopup();
+          showSpotDetail(stop, prevStop, true);
+        };
+
+        card.addEventListener('click', handleSpotSelect);
+        card.querySelector('.detail-open-btn').addEventListener('click', (e) => {
+          e.stopPropagation();
+          handleSpotSelect(e);
+        });
+
+        marker.on('click', () => {
+          document.querySelectorAll('.spot-card').forEach(c => c.classList.remove('selected'));
+          card.classList.add('selected');
+          showSpotDetail(stop, prevStop, true);
+        });
+        markerRegistry[`spot-${stop.step}`] = marker;
+
+        // 근처 추천순 음식점 목록
+        if (stop.foods && stop.foods.length > 0) {
+          const foodWrap = document.createElement('div');
+          foodWrap.className = 'nearby-foods';
+          foodWrap.innerHTML = `
+            <div class="nearby-foods-header">
+              <span>🍽️ 근처 추천순 음식점 (${stop.foods.length}곳)</span>
+              <span>클릭 시 상세·리뷰·구글맵</span>
+            </div>
+          `;
+
+          stop.foods.forEach(food => {
+            const foodCode = `${stop.step}-${food.rank}`;
+            const fItem = document.createElement('div');
+            fItem.className = 'food-item';
+            fItem.innerHTML = `
+              <span class="food-code">${foodCode}</span>
+              <div class="food-info">
+                <strong>${food.name} · <span style="font-weight:600;">${food.genre}</span></strong>
+                <span>${food.signature}</span>
+              </div>
+            `;
+            fItem.addEventListener('click', (e) => {
+              e.stopPropagation();
+              document.querySelectorAll('.spot-card').forEach(c => c.classList.remove('selected'));
+              card.classList.add('selected');
+              if (!showFoodMarkers) {
+                showFoodMarkers = true;
+                btnFoodToggle.classList.add('active-food');
+                btnFoodToggle.textContent = '🍽️ 음식점 핀 ON';
+                renderDay(false);
+              }
+              const targetFoodMarker = markerRegistry[`food-${foodCode}`];
+              if (targetFoodMarker) {
+                map.setView([food.lat, food.lng], 16);
+                targetFoodMarker.openPopup();
+              }
+              showFoodDetail(stop, food, true);
+            });
+            foodWrap.appendChild(fItem);
+
+            // 3. 음식점 핀 ON 상태일 때 지도에 '동선숫자-1' 핀 생성
+            if (showFoodMarkers) {
+              boundsPoints.push([food.lat, food.lng]);
+              const foodIcon = L.divIcon({
+                className: '',
+                html: `<div class="custom-pin pin-food">${foodCode}</div>`,
+                iconSize: [36, 22],
+                iconAnchor: [18, 11],
+                popupAnchor: [0, -10]
+              });
+              const fMarker = L.marker([food.lat, food.lng], { icon: foodIcon }).addTo(foodLayer);
+              fMarker.bindPopup(`
+                <div style="min-width:210px; font-family:sans-serif;">
+                  <div style="font-size:11px; font-weight:800; color:#ea580c;">동선 ${stop.step}번 근처 · 추천 ${food.rank}순위 (${foodCode})</div>
+                  <div style="font-size:14px; font-weight:800; margin:2px 0 3px;">${food.name}</div>
+                  <div style="font-size:12px; color:#475569; margin-bottom:5px;">${food.signature}</div>
+                  <a href="${food.googleMapsUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block; font-size:11px; font-weight:700; color:#1a73e8; text-decoration:none;">📍 구글맵에서 열기 ↗</a>
+                </div>
+              `);
+              fMarker.on('click', () => {
+                showFoodDetail(stop, food, true);
+              });
+              markerRegistry[`food-${foodCode}`] = fMarker;
+            }
+          });
+
+          card.appendChild(foodWrap);
+        }
+
+        timelineList.appendChild(card);
+
+        // 4. 이동 구간 정보 (순서표현 ON 시 표시)
+        if (stop.transitToNext && idx < dayData.stops.length - 1) {
+          const nextStop = dayData.stops[idx + 1];
+          const tCard = document.createElement('div');
+          tCard.className = 'transit-card' + (showRouteOrder ? ' visible' : '');
+          tCard.innerHTML = `
+            <div><span class="transit-badge">${stop.isHotel ? '출발' : stop.step} → ${nextStop.step}</span> <strong>${stop.transitToNext.duration}</strong></div>
+            <div style="margin-top:3px; font-weight:700;">🚆 ${stop.transitToNext.line}</div>
+            <div style="margin-top:2px; color:#0f766e;">${stop.transitToNext.detail}</div>
+          `;
+          timelineList.appendChild(tCard);
+
+          if (showRouteOrder) {
+            const segCoords = [[stop.lat, stop.lng], [nextStop.lat, nextStop.lng]];
+            L.polyline(segCoords, {
+              color: '#0d9488',
+              weight: 4,
+              opacity: 0.85,
+              dashArray: '8, 6'
+            }).addTo(routeLayer);
+
+            const midLat = (stop.lat + nextStop.lat) / 2;
+            const midLng = (stop.lng + nextStop.lng) / 2;
+            const labelIcon = L.divIcon({
+              className: '',
+              html: `<div class="route-label">${stop.isHotel ? '숙' : stop.step}→${nextStop.step} · ${stop.transitToNext.duration}</div>`,
+              iconSize: [115, 22],
+              iconAnchor: [57, 11]
+            });
+            L.marker([midLat, midLng], { icon: labelIcon, interactive: false }).addTo(routeLayer);
+          }
+        }
+      });
+
+      // 날짜 전환 시 첫 번째 주요 관광지 상세 정보를 기본으로 표시 (스크롤 없이 초기화)
+      if (fitBounds && dayData.stops.length > 0) {
+        const defaultStop = dayData.stops[1] || dayData.stops[0];
+        const defaultPrev = dayData.stops[1] ? dayData.stops[0] : null;
+        showSpotDetail(defaultStop, defaultPrev, false);
+      }
+
+      if (fitBounds && boundsPoints.length > 0) {
+        map.fitBounds(boundsPoints, { padding: [45, 45] });
+      }
+    }
+
+    // 초기 실행
+    renderDay(true);
+  </script>
+</body>
+</html>
